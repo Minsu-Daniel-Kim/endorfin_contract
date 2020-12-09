@@ -20,7 +20,10 @@ contract ProposalFactory {
         uint256 optionPrice,
         uint256 optionPremium,
         uint256 optionInterval,
-        uint256 poolPeriod
+        uint256 commission,
+        string memory name,
+        string memory symbol,
+        address daiAddress
     ) public {
         Proposal newProposal = new Proposal(
             admin,
@@ -33,7 +36,10 @@ contract ProposalFactory {
             optionPrice,
             optionPremium,
             optionInterval,
-            poolPeriod
+            commission,
+            name,
+            symbol,
+            daiAddress
         );
         deployedProposals.push(address(newProposal));
     }

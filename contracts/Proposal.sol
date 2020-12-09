@@ -4,17 +4,17 @@ pragma solidity ^0.7.3;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract Proposal {
+contract Proposal is ERC20 {
+    // uint256 public poolTokenSupply;
     address admin;
     IERC20 DAI;
 
     // Proposal spec
-    address[] tokenAddresses;
+    // address[] tokenAddresses;
     IERC20[] tokens;
     address public proposer;
-    address[] participants;
-    uint256 nParticipant;
-    uint256 poolPeriod;
+
+    // uint256 poolPeriod;
     uint256[] amounts;
     uint256 startDate;
     uint256 endDate;
@@ -22,40 +22,42 @@ contract Proposal {
     uint256 optionPrice;
     uint256 optionPremium;
     uint256 optionInterval;
+    uint256 commission;
     bool isOpen = true;
 
     // option buyer list
+    address[] optionSellers;
     address[] optionBuyers;
-
-    //
-    struct Pair {
-        IERC20 token;
-        uint256 amount;
-    }
+    // token - amount pair
+    // struct Pair {
+    //     IERC20 token;
+    //     uint256 amount;
+    // }
 
     // Maximum amount of each token to enter
-    mapping(IERC20 => uint256) maxAmountMap;
+    // mapping(IERC20 => uint256) maxAmountMap;
 
     // Amount of each token collected
     mapping(IERC20 => uint256) collectedAmountMap;
 
     // participate - token
-    mapping(address => Pair[]) tokenMap;
+    // mapping(address => Pair[]) tokenMap;
 
     // participate - amount commited
-    mapping(address => uint256) amountMap;
+    // mapping(address => uint256) amountMap;
 
-    // Total amount of dai reserved
+    uint256 optionSellerTotalAmmount;
+
+    // Option buyer - Dai commit ratio
+    mapping(address => uint256) optionSellerPortionMap;
+
     uint256 optionBuyerTotalAmmount;
-
-    // Option buyer - Dai amount
-    // mapping(address => uint256) optionBuyerMap;
 
     // Option buyer - Dai commit ratio
     mapping(address => uint256) optionBuyerPortionMap;
 
     // option buyer - claimed amount
-    mapping(address => uint256) claimedDai;
+    mapping(address => uint256) claimedPoolTokens;
 
     constructor(
         address _admin,
@@ -68,28 +70,31 @@ contract Proposal {
         uint256 _optionPrice,
         uint256 _optionPremium,
         uint256 _optionInterval,
-        uint256 _poolPeriod
-    ) public {
+        // uint _poolPeriod,
+        uint256 _commission,
+        string memory _name,
+        string memory _symbol,
+        address daiAddress
+    ) public ERC20(_name, _symbol) {
         admin = _admin;
         proposer = _proposer;
-        tokenAddresses = _tokens;
+        // tokenAddresses = _tokens;
         amounts = _amounts;
         startDate = _startDate;
         endDate = _endDate;
         period = _period;
+        commission = _commission;
         optionPrice = _optionPrice;
         optionPremium = _optionPremium;
         optionInterval = _optionInterval;
-        poolPeriod = _poolPeriod;
+        // poolPeriod = _poolPeriod;
+        poolTokenSupply = 100;
+        DAI = IERC20(daiAddress);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             tokens.push(IERC20(_tokens[i]));
-            maxAmountMap[IERC20(_tokens[i])] = _amounts[i];
+            // maxAmountMap[IERC20(_tokens[i])] = _amounts[i];
         }
-    }
-
-    function setDaiAddress(address daiAddress) public {
-        DAI = IERC20(daiAddress);
     }
 
     function enterPool(address[] memory _tokens, uint256[] memory _amounts)
@@ -99,16 +104,16 @@ contract Proposal {
         require(block.timestamp < endDate, "The proposal is already expired");
 
         require(
-            collectedAmountMap[tokens[0]] < maxAmountMap[tokens[0]],
+            collectedAmountMap[IERC20(_tokens[0])] + _amounts[0] < amounts[0],
             "It's already full"
         );
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             IERC20 token = IERC20(_tokens[i]);
             uint256 amount = _amounts[i];
-            token.approve(address(this), amount);
+            // token.approve(address(this), amount);
 
-            tokenMap[msg.sender].push(Pair({token: token, amount: amount}));
+            // tokenMap[msg.sender].push(Pair({token: token, amount: amount}));
 
             collectedAmountMap[token] += amount;
         }
@@ -118,13 +123,25 @@ contract Proposal {
             isOpen = false;
         }
 
-        participants.push(msg.sender);
-        nParticipant++;
+        optionBuyerTotalAmmount += _amounts[0];
+        optionBuyerPortionMap[msg.sender] = _amounts[0];
+        optionBuyers.push(msg.sender);
     }
 
-    // function getAllowance() external view returns (uint256) {
+    function sellOption(uint256 daiAmount) public {
+        require(DAI.balanceOf(msg.sender) >= daiAmount, "Lack of DAI balance");
 
-    // }
+        require(
+            optionSellerTotalAmmount + daiAmount < optionPrice,
+            "It's already full"
+        );
+
+        optionSellerTotalAmmount += daiAmount;
+
+        // float shareAmount = daiAmount / optionPrice;
+        optionSellerPortionMap[msg.sender] = daiAmount;
+        optionSellers.push(msg.sender);
+    }
 
     function finalizePool() public {
         require(
@@ -132,40 +149,34 @@ contract Proposal {
             "Only proposer can close the open proposal"
         );
 
-        for (uint256 i = 0; i < participants.length; i++) {
-            // IERC20 token = tokenMap[participants[i]];
+        for (uint256 i = 0; i < optionBuyers.length; i++) {
+            // IERC20 token = tokenMap[optionBuyers[i]];
 
-            Pair[] storage pairs = tokenMap[participants[i]];
+            // Pair[] storage pairs = tokenMap[optionBuyers[i]];
 
-            for (uint256 j = 0; j < pairs.length; j++) {
-                IERC20 token = pairs[j].token;
-                uint256 amount = pairs[j].amount;
-                token.transferFrom(participants[i], address(this), amount);
+            for (uint256 j = 0; j < tokens.length; j++) {
+                IERC20 token = tokens[j];
+                uint256 amount = amounts[j];
+                token.transferFrom(optionBuyers[i], address(this), amount);
             }
+
+            uint256 shareAmount = optionBuyerPortionMap[optionBuyers[i]] /
+                amounts[0];
+            uint256 poolTokenAmount = (poolTokenSupply - commission) *
+                shareAmount;
+            _mint(optionBuyers[i], poolTokenAmount);
+        }
+
+        for (uint256 i = 0; i < optionSellers.length; i++) {
+            uint256 daiAmount = optionSellerPortionMap[optionSellers[i]];
+            DAI.transferFrom(optionSellers[i], address(this), daiAmount);
         }
 
         isOpen = false;
     }
 
-    function buyOption() public {
-        require(
-            DAI.balanceOf(msg.sender) >= optionPrice,
-            "Lack of DAI balance"
-        );
-
-        DAI.transferFrom(msg.sender, address(this), optionPrice);
-
-        optionBuyerTotalAmmount += optionPrice;
-
-        optionBuyerPortionMap[msg.sender] =
-            optionPrice /
-            optionBuyerTotalAmmount;
-
-        optionBuyers.push(msg.sender);
-    }
-
     function claimPremium() public {
-        require(optionBuyerPortionMap[msg.sender] > 0);
+        require(optionSellerPortionMap[msg.sender] > 0);
 
         // days -> unixtimestamps
         uint256 optionIntervalUnixtimestamp = optionInterval * 60 * 60 * 24;
@@ -177,19 +188,20 @@ contract Proposal {
         uint256 mult = diff / optionIntervalUnixtimestamp;
 
         // Total possible claim amounts
-        uint256 premium = mult *
+        uint256 premium = (mult *
             optionPremium *
-            optionBuyerPortionMap[msg.sender];
+            optionSellerPortionMap[msg.sender]) / optionPrice;
 
         // Eligible claim amount
-        uint256 eligibleClaimAmount = premium - claimedDai[msg.sender];
+        uint256 eligibleClaimAmount = premium - claimedPoolTokens[msg.sender];
 
         require(eligibleClaimAmount > 0, "Nothing to claim");
 
         // Claim the eligible amount
-        DAI.transfer(msg.sender, eligibleClaimAmount);
+        _mint(msg.sender, eligibleClaimAmount);
+        // DAI.transfer(msg.sender, eligibleClaimAmount);
 
-        claimedDai[msg.sender] += eligibleClaimAmount;
+        claimedPoolTokens[msg.sender] += eligibleClaimAmount;
     }
 
     function liquidatePool() public {
@@ -197,29 +209,65 @@ contract Proposal {
             msg.sender == admin,
             "Only admin can liquidate the open proposal"
         );
-        for (uint256 i = 0; i < participants.length; i++) {
-            Pair[] storage pairs = tokenMap[participants[i]];
-
-            for (uint256 j = 0; j < pairs.length; j++) {
-                IERC20 token = pairs[j].token;
-                uint256 amount = pairs[j].amount;
-                token.transfer(participants[i], amount);
+        for (uint256 i = 0; i < optionBuyers.length; i++) {
+            for (uint256 j = 0; j < tokens.length; j++) {
+                IERC20 token = tokens[j];
+                uint256 amount = amounts[j] *
+                    (this.balanceOf(optionBuyers[i]) / 100);
+                token.transfer(optionBuyers[i], amount);
             }
+
+            _burn(optionBuyers[i], this.balanceOf(optionBuyers[i]));
+        }
+
+        for (uint256 i = 0; i < optionSellers.length; i++) {
+            for (uint256 j = 0; j < tokens.length; j++) {
+                IERC20 token = tokens[j];
+                uint256 amount = amounts[j] *
+                    (this.balanceOf(optionSellers[i]) / 100);
+
+                token.transfer(optionSellers[i], amount);
+            }
+            uint256 daiAmount = optionSellerPortionMap[optionSellers[i]];
+            DAI.transfer(optionSellers[i], daiAmount);
+            _burn(optionSellers[i], this.balanceOf(optionSellers[i]));
         }
 
         isOpen = false;
     }
 
-    function getTokens() public view returns (address[] memory) {
-        return tokenAddresses;
+    function exerciseOption() public {
+        require(msg.sender == admin, "Only admin can exercise option");
+
+        for (uint256 i = 0; i < optionBuyers.length; i++) {
+            DAI.transfer(
+                optionBuyers[i],
+                optionBuyerPortionMap[optionBuyers[i]] / amounts[0]
+            );
+            _burn(optionBuyers[i], this.balanceOf(optionBuyers[i]));
+        }
+
+        for (uint256 i = 0; i < optionSellers.length; i++) {
+            for (uint256 j = 0; j < tokens.length; j++) {
+                IERC20 token = tokens[j];
+                uint256 amount = amounts[j] *
+                    (optionSellerPortionMap[optionSellers[i]] /
+                        optionSellerTotalAmmount);
+                token.transfer(optionSellers[i], amount);
+            }
+        }
     }
+
+    // function getTokens() public view returns (address[] memory) {
+    //     return tokenAddresses;
+    // }
 
     function getProposer() public view returns (address) {
         return proposer;
     }
 
-    function getParticipants() public view returns (address[] memory) {
-        return participants;
+    function getoptionBuyers() public view returns (address[] memory) {
+        return optionBuyers;
     }
 
     function getPeriod() public view returns (uint256) {
@@ -234,9 +282,9 @@ contract Proposal {
         return optionPremium;
     }
 
-    function getPoolPeriod() public view returns (uint256) {
-        return poolPeriod;
-    }
+    // function getPoolPeriod() public view returns (uint256) {
+    //     return poolPeriod;
+    // }
 
     function getOptionInterval() public view returns (uint256) {
         return optionInterval;
@@ -258,6 +306,6 @@ contract Proposal {
         return amounts;
     }
 
-    // uint256 startDate;
-    // uint256 endDate;
+    // uint startDate;
+    // uint endDate;
 }
