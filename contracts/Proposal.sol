@@ -24,7 +24,7 @@ contract Proposal is ERC20 {
     uint256 optionPremium;
     uint256 optionInterval;
     uint256 commissionRate;
-    // uint256 period = optionPremium * optionInterval * commission;
+    uint256 period;
     bool isOpen = true;
 
     // Proposal tokens & maximum amount to fund
@@ -63,6 +63,7 @@ contract Proposal is ERC20 {
         proposalTokens = _proposalTokens;
 
         totalTokenAmount = _totalTokenAmount;
+
         // for (uint256 i = 0; i < _proposalTokens.length; i++) {
         //     // proposalTokens.push(IERC20(_proposalTokens[i]));
         //     totalTokenAmount += _maximumAmounts[i];
@@ -85,6 +86,7 @@ contract Proposal is ERC20 {
         optionInterval = _optionInterval;
         commissionRate = _commissionRate;
         DAI = IERC20(_daiAddress);
+        period = (commissionRate * decimal * optionInterval) / optionPremium;
     }
 
     function enterPool(
@@ -261,6 +263,10 @@ contract Proposal is ERC20 {
             }
             _burn(optionSellers[i], this.balanceOf(optionSellers[i]));
         }
+    }
+
+    function isPeriodEnded() public view returns (bool) {
+        return block.timestamp > fundingEndTimestamp + (period * 3600 * 24);
     }
 
     function getProposer() public view returns (address) {
