@@ -1,8 +1,5 @@
 const { time } = require("@openzeppelin/test-helpers");
 
-// const RFT = artifacts.require("RFT.sol");
-// const NFT = artifacts.require("NFT.sol");
-
 const ERC20 = artifacts.require("DAI.sol");
 const Proposal = artifacts.require("Proposal.sol");
 const ProposalFactory = artifacts.require("ProposalFactory.sol");
@@ -10,7 +7,14 @@ const ProposalFactory = artifacts.require("ProposalFactory.sol");
 const INITIAL_AMOUNT = web3.utils.toWei("100");
 
 contract("RFT", async (addresses) => {
-  const [admin, user1, user2, user3, optionBuyer1, optionBuyer2, _] = addresses;
+  const [
+    admin,
+    optionBuyer1,
+    optionBuyer2,
+    optionSeller1,
+    optionSeller2,
+    _,
+  ] = addresses;
 
   let dai = null;
   let link = null;
@@ -19,6 +23,23 @@ contract("RFT", async (addresses) => {
   let proposalFactory = null;
   let deployedProposals = null;
   let proposal_1 = null;
+
+  const getUserBalance = () => {
+    [dai, link, aave].forEach((token) => {
+      [optionBuyer1, optionBuyer2, optionSeller1, optionSeller2].forEach(
+        async (user) => {
+          const balance = await token.balanceOf(user);
+          console.log(user + " " + token + " - ", balance.toString());
+        }
+      );
+    });
+  };
+  const getContractBalance = () => {
+    [dai, link, aave].forEach(async (token) => {
+      const balance = await token.balanceOf(proposal_1.address);
+      console.log("Proposal contract " + token + " - ", balance.toString());
+    });
+  };
 
   it("creates three tokens: DAI, LINK, AAVE", async () => {
     dai = await ERC20.new("DAI Stablecoin", "DAI");
@@ -32,61 +53,28 @@ contract("RFT", async (addresses) => {
 
   it("allocates tokens to users", async () => {
     await Promise.all([
-      dai.mint(user1, INITIAL_AMOUNT),
-      link.mint(user1, INITIAL_AMOUNT),
-      aave.mint(user1, INITIAL_AMOUNT),
-
-      dai.mint(user2, INITIAL_AMOUNT),
-      link.mint(user2, INITIAL_AMOUNT),
-      aave.mint(user2, INITIAL_AMOUNT),
-
-      dai.mint(user3, INITIAL_AMOUNT),
-      link.mint(user3, INITIAL_AMOUNT),
-      aave.mint(user3, INITIAL_AMOUNT),
-
       dai.mint(optionBuyer1, INITIAL_AMOUNT),
+      link.mint(optionBuyer1, INITIAL_AMOUNT),
+      aave.mint(optionBuyer1, INITIAL_AMOUNT),
+
       dai.mint(optionBuyer2, INITIAL_AMOUNT),
+      link.mint(optionBuyer2, INITIAL_AMOUNT),
+      aave.mint(optionBuyer2, INITIAL_AMOUNT),
+
+      dai.mint(optionSeller1, INITIAL_AMOUNT),
+      link.mint(optionSeller1, INITIAL_AMOUNT),
+      aave.mint(optionSeller1, INITIAL_AMOUNT),
+
+      dai.mint(optionSeller2, INITIAL_AMOUNT),
+      link.mint(optionSeller2, INITIAL_AMOUNT),
+      aave.mint(optionSeller2, INITIAL_AMOUNT),
     ]);
 
-    const user1DaiBalance = await dai.balanceOf(user1);
-    const user1LinkBalance = await link.balanceOf(user1);
-    const user1AaveBalance = await dai.balanceOf(user1);
-
-    console.log("User1 - ", user1);
-    console.log("User1 - DAI ", user1DaiBalance.toString());
-    console.log("User1 - LINK ", user1LinkBalance.toString());
-    console.log("User1 - AAVE ", user1AaveBalance.toString());
-
-    const user2DaiBalance = await dai.balanceOf(user2);
-    const user2LinkBalance = await link.balanceOf(user2);
-    const user2AaveBalance = await dai.balanceOf(user2);
-
-    console.log("User2 - ", user2);
-    console.log("User2 - DAI ", user2DaiBalance.toString());
-    console.log("User2 - LINK ", user2LinkBalance.toString());
-    console.log("User2 - AAVE ", user2AaveBalance.toString());
-
-    const user3DaiBalance = await dai.balanceOf(user3);
-    const user3LinkBalance = await link.balanceOf(user3);
-    const user3AaveBalance = await dai.balanceOf(user3);
-
-    console.log("User3 - ", user3);
-    console.log("User3 - DAI ", user3DaiBalance.toString());
-    console.log("User3 - LINK ", user3LinkBalance.toString());
-    console.log("User3 - AAVE ", user3AaveBalance.toString());
-
-    const optionBuyer1Dai = await dai.balanceOf(optionBuyer1);
-    console.log("OptionBuyer1 - ", optionBuyer1);
-    console.log("OptionBuyer1 - DAI ", optionBuyer1Dai.toString());
-
-    const optionBuyer2Dai = await dai.balanceOf(optionBuyer2);
-    console.log("OptionBuyer1 - ", optionBuyer2);
-    console.log("OptionBuyer1 - DAI ", optionBuyer2Dai.toString());
+    getUserBalance();
   });
 
   it("allocates tokens to users", async () => {
     proposalFactory = await ProposalFactory.new();
-
     console.log("Proposal factory address: ", proposalFactory.address);
   });
 
@@ -97,18 +85,26 @@ contract("RFT", async (addresses) => {
     const endDate = new Date("2020-12-07").getTime();
     console.log(endDate);
 
+    const [aaveAmount, linkAmount] = [10, 20];
+
     await proposalFactory.createProposal(
       admin, // _admin
-      admin,
-      [link.address, aave.address], // _tokens
-      [web3.utils.toWei("10"), web3.utils.toWei("20")], // _amounts
-      startDate, // _startDate
-      endDate, // _endDate
-      3, // _period
-      10, // _optionPrice
-      4, // _optionPremium
+      admin, // _proposer
+      [aave.address, link.address], // _proposalTokens
+      [
+        web3.utils.toWei(aaveAmount.toString()),
+        web3.utils.toWei(linkAmount.toString()),
+      ], // _maximumAmounts
+      web3.utils.toWei((aaveAmount + linkAmount).toString()),
+      startDate, // _fundingStartTimestamp
+      endDate, // _fundingEndTimestamp
+      web3.utils.toWei("100"), // _optionPrice
+      web3.utils.toWei("1"), // _optionPremium
       7, // _optionInterval
-      3 // _poolPeriod
+      30, // _commission
+      "wow", // _name
+      "WOW", // _symbol
+      dai.address
     );
 
     deployedProposals = await proposalFactory.getDeployedProposals();
@@ -117,207 +113,121 @@ contract("RFT", async (addresses) => {
 
   it("shows a 1st proposal description", async () => {
     proposal_1 = await Proposal.at(deployedProposals[0]);
-    await proposal_1.setDaiAddress(dai.address);
-    const isOpen = await proposal_1.getIsOpen();
-
-    const proposer = await proposal_1.getProposer();
-
-    const tokens = await proposal_1.getTokens();
-    const amounts = await proposal_1.getAmounts();
-
-    const period = await proposal_1.getPeriod();
-    const optionPrice = await proposal_1.getOptionPrice();
-    const optionPremium = await proposal_1.getOptionPremium();
-
-    const startTimestamp = await proposal_1.getStartDate();
-    const endTimestamp = await proposal_1.getEndDate();
-
-    console.log("Admin: ", admin);
-    console.log("Proposer: ", proposer);
-
-    console.log("isOpen: ", isOpen.toString());
-    console.log("tokens: ", tokens.toString());
-    console.log("amounts: ", amounts.toString());
-    console.log("period: ", period.toString());
-    console.log("optionPrice: ", optionPrice.toString());
-    console.log("optionPremium: ", optionPremium.toString());
-    console.log("start timestamp: ", startTimestamp.toString());
-    console.log("end timestamp: ", endTimestamp.toString());
   });
 
   it("User 1 enters a pool", async () => {
-    let participants = await proposal_1.getParticipants();
+    let optionBuyers = await proposal_1.getOptionBuyers();
 
-    console.log("Participants before: ", participants.toString());
+    console.log("Option buyers before: ", optionBuyers.toString());
 
-    proposal_1.enterPool(
-      [link.address, aave.address],
-      [web3.utils.toWei("5"), web3.utils.toWei("10")],
-      { from: user1 }
+    const [aaveAmount1, linkAmount1] = [6, 12];
+    await aave.approve(
+      proposal_1.address,
+      web3.utils.toWei(aaveAmount1.toString()),
+      {
+        from: optionBuyer1,
+      }
+    );
+    await link.approve(
+      proposal_1.address,
+      web3.utils.toWei(linkAmount1.toString()),
+      {
+        from: optionBuyer1,
+      }
+    );
+    await proposal_1.enterPool(
+      [aave.address, link.address],
+      [
+        web3.utils.toWei(aaveAmount1.toString()),
+        web3.utils.toWei(linkAmount1.toString()),
+      ],
+      web3.utils.toWei((aaveAmount1 + linkAmount1).toString()),
+      { from: optionBuyer1 }
     );
 
-    participants = await proposal_1.getParticipants();
-
-    console.log("Participants after: ", participants.toString());
-  });
-
-  it("User 2 enters a pool", async () => {
-    let participants = await proposal_1.getParticipants();
-
-    console.log("Participants before: ", participants.toString());
-
-    proposal_1.enterPool(
-      [link.address, aave.address],
-      [web3.utils.toWei("5"), web3.utils.toWei("10")],
-      { from: user2 }
+    const [aaveAmount2, linkAmount2] = [4, 8];
+    await aave.approve(
+      proposal_1.address,
+      web3.utils.toWei(aaveAmount2.toString()),
+      {
+        from: optionBuyer2,
+      }
+    );
+    await link.approve(
+      proposal_1.address,
+      web3.utils.toWei(linkAmount2.toString()),
+      {
+        from: optionBuyer2,
+      }
     );
 
-    participants = await proposal_1.getParticipants();
+    await proposal_1.enterPool(
+      [aave.address, link.address],
+      [
+        web3.utils.toWei(aaveAmount2.toString()),
+        web3.utils.toWei(linkAmount2.toString()),
+      ],
+      web3.utils.toWei((aaveAmount2 + linkAmount2).toString()),
+      { from: optionBuyer2 }
+    );
+    optionBuyers = await proposal_1.getOptionBuyers();
 
-    console.log("Participants after: ", participants.toString());
+    console.log("Option buyers after: ", optionBuyers.toString());
+    const contractDaiBalance = await dai.balanceOf(proposal_1.address);
+    const contractLinkBalance = await link.balanceOf(proposal_1.address);
+    const contractAaveBalance = await aave.balanceOf(proposal_1.address);
+
+    console.log("contractDaiBalance - DAI ", contractDaiBalance.toString());
+    console.log("contractLinkBalance - LINK ", contractLinkBalance.toString());
+    console.log("contractAaveBalance - AAVE ", contractAaveBalance.toString());
   });
 
-  it("checks allowances", async () => {
-    await link.approve(proposal_1.address, web3.utils.toWei("5"), {
-      from: user1,
+  it("sells an option", async () => {
+    await dai.approve(proposal_1.address, web3.utils.toWei("20"), {
+      from: optionSeller1,
+    });
+    await proposal_1.sellOption(web3.utils.toWei("20"), {
+      from: optionSeller1,
+    });
+    const daiBalanceOptionSeller1 = await dai.balanceOf(optionSeller1);
+    console.log(
+      "daiBalanceOptionSeller1: ",
+      daiBalanceOptionSeller1.toString()
+    );
+  });
+
+  it("finalizes a pool", async () => {
+    await proposal_1.finalizePool({
+      from: admin,
     });
 
-    await aave.approve(proposal_1.address, web3.utils.toWei("10"), {
-      from: user1,
-    });
-
-    await link.approve(proposal_1.address, web3.utils.toWei("5"), {
-      from: user2,
-    });
-
-    await aave.approve(proposal_1.address, web3.utils.toWei("10"), {
-      from: user2,
-    });
-
-    const linkAllowanceOfUser1 = await link.allowance(
-      user1,
-      proposal_1.address
+    const link_balance = await proposal_1.buyerTokenAmount(
+      optionBuyer1,
+      link.address
     );
-    const aaveAllowanceOfUser1 = await aave.allowance(
-      user1,
-      proposal_1.address
+    console.log("link_balance: ", link_balance.toString());
+    const aave_balance = await proposal_1.buyerTokenAmount(
+      optionBuyer1,
+      aave.address
     );
+    console.log("aave_balance: ", aave_balance.toString());
 
-    console.log("linkAllowanceOfUser1: ", linkAllowanceOfUser1.toString());
-    console.log("aaveAllowanceOfUser1: ", aaveAllowanceOfUser1.toString());
+    const poolToken = await proposal_1.balanceOf(optionBuyer1);
+    console.log("poolToken: ", poolToken.toString());
 
-    //---------------------------------------------------------------------------------------
-    const linkAllowanceOfUser2 = await link.allowance(
-      user2,
-      proposal_1.address
-    );
-    const aaveAllowanceOfUser2 = await aave.allowance(
-      user2,
-      proposal_1.address
-    );
-
-    console.log("linkAllowanceOfUser2: ", linkAllowanceOfUser2.toString());
-    console.log("aaveAllowanceOfUser2: ", aaveAllowanceOfUser2.toString());
+    getUserBalance();
+    getContractBalance();
   });
 
-  it("finalized a proposal", async () => {
-    await proposal_1.finalizePool({ from: admin });
-
-    const isOpen = await proposal_1.getIsOpen();
-    console.log("isOpen: ", isOpen.toString());
-
-    const linkBalance = await link.balanceOf(proposal_1.address);
-    const aaveBalance = await aave.balanceOf(proposal_1.address);
-
-    console.log("linkBalance: ", linkBalance.toString());
-    console.log("aaveBalance: ", aaveBalance.toString());
+  it("exercises an option", async () => {
+    await proposal_1.exerciseOption({ from: admin });
+    getUserBalance();
+    getContractBalance();
   });
 
-  it("buys an option", async () => {
-    await dai.approve(proposal_1.address, web3.utils.toWei("10"), {
-      from: optionBuyer1,
-    });
-    await proposal_1.buyOption({ from: optionBuyer1 });
-
-    const daiBalanceOfBuyer1 = await dai.balanceOf(optionBuyer1);
-    console.log("daiBalanceOfBuyer1: ", daiBalanceOfBuyer1.toString());
-  });
-
-  it("claims premium", async () => {
-    await proposal_1.claimPremium({ from: optionBuyer1 });
-
-    // const user1DaiBalance = await dai.balanceOf(user1);
-  });
-
-  it("liquidates all", async () => {
-    await proposal_1.liquidatePool({ from: admin });
-    const linkBalance = await link.balanceOf(proposal_1.address);
-    const aaveBalance = await aave.balanceOf(proposal_1.address);
-
-    console.log(linkBalance.toString());
-    console.log(aaveBalance.toString());
-  });
-
-  // const nft = await NFT.new("My awesome NFT", "NFT");
-  // await nft.mint(admin, 1);
-
-  // const rft = await RFT.new(
-  //   "My awesome RFT",
-  //   "RFT",
-  //   nft.address,
-  //   1,
-  //   1,
-  //   web3.utils.toWei("100000"),
-  //   dai.address
-  // );
-
-  // await nft.approve(rft.address, 1);
-  // await rft.startIco();
-
-  // await dai.approve(rft.address, DAI_AMOUNT, { from: buyer1 });
-  // await rft.buyShare(SHARE_AMOUNT, { from: buyer1 });
-
-  // await dai.approve(rft.address, DAI_AMOUNT, { from: buyer2 });
-  // await rft.buyShare(SHARE_AMOUNT, { from: buyer2 });
-
-  // await dai.approve(rft.address, DAI_AMOUNT, { from: buyer3 });
-  // await rft.buyShare(SHARE_AMOUNT, { from: buyer3 });
-
-  // await dai.approve(rft.address, DAI_AMOUNT, { from: buyer4 });
-  // await rft.buyShare(SHARE_AMOUNT, { from: buyer4 });
-
-  // await time.increase(7 * 86400 + 1);
-  // await rft.withdrawProfits();
-
-  // const balanceDAIBuyer1 = await dai.balanceOf(buyer1);
-
-  // const balanceShareBuyer1 = await rft.balanceOf(buyer1);
-  // const balanceShareBuyer2 = await rft.balanceOf(buyer2);
-  // const balanceShareBuyer3 = await rft.balanceOf(buyer3);
-  // const balanceShareBuyer4 = await rft.balanceOf(buyer4);
-
-  // console.log(
-  //   balanceShareBuyer1,
-  //   balanceShareBuyer2,
-  //   balanceShareBuyer3,
-  //   balanceShareBuyer4
-  // );
-
-  // assert(balanceShareBuyer1.toString() === SHARE_AMOUNT);
-  // assert(balanceShareBuyer2.toString() === SHARE_AMOUNT);
-  // assert(balanceShareBuyer3.toString() === SHARE_AMOUNT);
-  // assert(balanceShareBuyer4.toString() === SHARE_AMOUNT);
-
-  // console.log("balanceDAIBuyer1: ", balanceDAIBuyer1.toString());
-  // console.log("balanceShareBuyer1: ", balanceShareBuyer1.toString());
-  // console.log("END buyer1");
-
-  // console.log("balanceShareBuyer2: ", balanceShareBuyer2.toString());
-  // console.log("balanceShareBuyer3: ", balanceShareBuyer3.toString());
-
-  // const balanceAdminDai = await dai.balanceOf(admin);
-  // assert(balanceAdminDai.toString() === web3.utils.toWei("100000"));
-
-  // console.log("balanceAdminDai: ", balanceAdminDai.toString());
-  //   console.log(addresses);
+  // it("refunds", async () => {
+  //   await proposal_1.refund({ from: admin });
+  //   getUserBalance();
+  //   getContractBalance();
+  // });
 });

@@ -10,36 +10,38 @@ contract ProposalFactory {
     address[] public deployedProposals;
 
     function createProposal(
-        address admin,
-        address proposer,
-        address[] memory tokens,
-        uint256[] memory amounts,
-        uint256 startDate,
-        uint256 endDate,
-        uint256 period,
-        uint256 optionPrice,
-        uint256 optionPremium,
-        uint256 optionInterval,
-        uint256 commission,
-        string memory name,
-        string memory symbol,
-        address daiAddress
+        address _admin,
+        address _proposer,
+        address[] memory _proposalTokens,
+        uint256[] memory _maximumAmounts,
+        uint256 _totalTokenAmount,
+        uint256 _fundingStartTimestamp,
+        uint256 _fundingEndTimestamp,
+        uint256 _optionPrice,
+        uint256 _optionPremium,
+        uint256 _optionInterval,
+        uint256 _commission,
+        string memory _name,
+        string memory _symbol,
+        address _daiAddress
     ) public {
         Proposal newProposal = new Proposal(
-            admin,
-            proposer,
-            tokens,
-            amounts,
-            startDate,
-            endDate,
-            period,
-            optionPrice,
-            optionPremium,
-            optionInterval,
-            commission,
-            name,
-            symbol,
-            daiAddress
+            _admin,
+            _proposer,
+            _proposalTokens,
+            _maximumAmounts,
+            _totalTokenAmount,
+            _name,
+            _symbol
+        );
+        newProposal.setTerm(
+            _fundingStartTimestamp,
+            _fundingEndTimestamp,
+            _optionPrice,
+            _optionPremium,
+            _optionInterval,
+            _commission,
+            _daiAddress
         );
         deployedProposals.push(address(newProposal));
     }
