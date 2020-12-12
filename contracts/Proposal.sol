@@ -263,47 +263,51 @@ contract Proposal is ERC20 {
         }
     }
 
-    // function getProposer() public view returns (address) {
-    //     return proposer;
-    // }
+    function getProposer() public view returns (address) {
+        return proposer;
+    }
 
     function getOptionBuyers() public view returns (address[] memory) {
         return optionBuyers;
     }
 
-    // function getPeriod() public view returns (uint256) {
-    //     return period;
-    // }
+    function getOptionSellers() public view returns (address[] memory) {
+        return optionSellers;
+    }
 
-    // function getOptionPrice() public view returns (uint256) {
-    //     return optionPrice;
-    // }
+    function getFundingStartTimestamp() public view returns (uint256) {
+        return fundingStartTimestamp;
+    }
 
-    // function getOptionPremium() public view returns (uint256) {
-    //     return optionPremium;
-    // }
+    function getFundingEndTimestamp() public view returns (uint256) {
+        return fundingEndTimestamp;
+    }
 
-    // // function getPoolPeriod() public view returns (uint256) {
-    // //     return poolPeriod;
-    // // }
+    function getOptionPrice() public view returns (uint256) {
+        return optionPrice;
+    }
 
-    // function getOptionInterval() public view returns (uint256) {
-    //     return optionInterval;
-    // }
+    function getTotalTokenAmount() public view returns (uint256) {
+        return totalTokenAmount;
+    }
 
-    // function getStartDate() public view returns (uint256) {
-    //     return startDate;
-    // }
+    function getOptionPremium() public view returns (uint256) {
+        return optionPremium;
+    }
 
-    // function getEndDate() public view returns (uint256) {
-    //     return endDate;
-    // }
+    function getOptionInterval() public view returns (uint256) {
+        return optionInterval;
+    }
 
-    // function getIsOpen() public view returns (bool) {
-    //     return isOpen;
-    // }
+    function getIsOpen() public view returns (bool) {
+        return isOpen;
+    }
 
-    // function getAmounts() public view returns (uint256[] memory) {
-    //     return amounts;
-    // }
+    function getProposalTokens() public view returns (address[] memory) {
+        return proposalTokens;
+    }
+
+    function getMaximumAmounts() public view returns (uint256[] memory) {
+        return maximumAmounts;
+    }
 }
